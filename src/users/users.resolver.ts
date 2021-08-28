@@ -2,14 +2,13 @@ import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { AuthUser } from 'src/auth/authUser.decorator';
-import { CoreOutput } from 'src/common/dtos/outputDto';
-import { CreateUserInput } from './dtos/createUser.dto';
 import {
+  CreateUserInput,
+  LoginInput,
   UpdateUserInput,
   UpdateUserPasswordInput,
-} from './dtos/updateUser.dto';
-import { LogginOutput, LoginInput } from './dtos/login.dto';
-import { UserProfileInput } from './dtos/userProfile.dto';
+} from './dtos/user.dto';
+
 import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
 
@@ -17,13 +16,13 @@ import { UsersService } from './users.service';
 export class UsersResolver {
   constructor(private readonly userService: UsersService) {}
 
-  @Mutation(() => CoreOutput)
-  createUser(@Args() createUserInput: CreateUserInput): Promise<CoreOutput> {
-    return this.userService.createUser(createUserInput);
+  @Mutation(() => User)
+  async createUser(@Args() createUserInput: CreateUserInput): Promise<User> {
+    return await this.userService.createUser(createUserInput);
   }
 
-  @Query(() => LogginOutput)
-  Login(@Args() loginInput: LoginInput): Promise<LogginOutput> {
+  @Query(() => String)
+  Login(@Args() loginInput: LoginInput): Promise<string> {
     return this.userService.login(loginInput);
   }
 
@@ -33,11 +32,10 @@ export class UsersResolver {
     return user;
   }
 
-  @Query(() => User, { nullable: true })
+  @Query(() => User)
   @UseGuards(AuthGuard)
-  async user(@Args() userProfileInput: UserProfileInput): Promise<User> | null {
-    const user = await this.userService.getUser(userProfileInput.id);
-    return user;
+  async user(@Args('id') id: number): Promise<User> {
+    return await this.userService.getUser(id);
   }
 
   @Mutation(() => User)
@@ -49,12 +47,12 @@ export class UsersResolver {
     return await this.userService.updateUser(user.id, updateUserInput);
   }
 
-  @Mutation(() => CoreOutput)
+  @Mutation(() => User)
   @UseGuards(AuthGuard)
   async updateUserPassword(
     @AuthUser() user: User,
     @Args() updateUserPasswordInput: UpdateUserPasswordInput,
-  ): Promise<CoreOutput> {
+  ): Promise<User> {
     return await this.userService.updateUserPassword(
       user.id,
       updateUserPasswordInput,

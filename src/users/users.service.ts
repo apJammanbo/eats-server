@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CoreOutput } from 'src/common/dtos/outputDto';
 import { Repository } from 'typeorm';
-import { CreateUserInput } from './dtos/createUser.dto';
-import { LogginOutput, LoginInput } from './dtos/login.dto';
 import { User } from './entities/user.entity';
-import { JwtService } from 'src/jwt/jwt.service';
+import UserError, { USER_ERROR } from './processError';
+import { JwtService } from '../jwt/jwt.service';
 import {
+  CreateUserInput,
+  LoginInput,
   UpdateUserInput,
   UpdateUserPasswordInput,
-} from './dtos/updateUser.dto';
+} from './dtos/user.dto';
 
 @Injectable()
 export class UsersService {
@@ -19,54 +19,37 @@ export class UsersService {
   ) {}
 
   // Create User
-  async createUser({
-    email,
-    password,
-    role,
-  }: CreateUserInput): Promise<CoreOutput> {
-    try {
-      const existUser = await this.users.findOne({ email });
-      if (existUser) {
-        return {
-          ok: false,
-          error: '이미 사용중인 이메일입니다.',
-        };
-      }
-      await this.users.save(this.users.create({ email, password, role }));
-      return { ok: true };
-    } catch (e) {
-      return {
-        ok: false,
-        error: e.message,
-      };
+  createUser = async (createUserInput: CreateUserInput): Promise<User> => {
+    const existUser = await this.users.findOne({
+      where: { email: createUserInput.email },
+    });
+    if (existUser) {
+      throw new UserError(USER_ERROR.ALREADY_EXIST_EMAIL);
     }
-  }
+    return await this.users.save(this.users.create(createUserInput));
+  };
 
   // Login
-  async login({ email, password }: LoginInput): Promise<LogginOutput> {
-    try {
-      const user = await this.users.findOne(
-        { email },
-        { select: ['password'] },
-      );
-      if (!user) {
-        return { ok: false, error: 'User not found!' };
-      } else {
-        const isLogin = user.checkPassword(password);
-        if (!isLogin) {
-          return { ok: false, error: 'password is not correct' };
-        }
-        const token = this.jwtService.sign({ id: user.id });
-        return { ok: true, token };
+  async login({ email, password }: LoginInput): Promise<string> {
+    const user = await this.users.findOne({ email }, { select: ['password'] });
+    if (!user) {
+      throw new UserError(USER_ERROR.USER_NOT_FOUND);
+    } else {
+      const isLogin = user.checkPassword(password);
+      if (!isLogin) {
+        throw new UserError(USER_ERROR.PASSWORD_NOT_CORRECT);
       }
-    } catch (e) {
-      return { ok: false, error: e.message };
+      return this.jwtService.sign({ id: user.id });
     }
   }
 
   // Get User
   async getUser(id: number): Promise<User> {
-    return await this.users.findOne({ id });
+    const user = await this.users.findOne({ id });
+    if (!user) {
+      throw new UserError(USER_ERROR.USER_NOT_FOUND);
+    }
+    return user;
   }
 
   // update user
@@ -76,9 +59,6 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.getUser(id);
     const updatedUser = new User({ ...user, ...updateUserInput });
-    if (updateUserInput.password) {
-      await updatedUser.hashPassword();
-    }
     await this.users.save(updatedUser);
     return await this.getUser(id);
   }
@@ -87,13 +67,10 @@ export class UsersService {
   async updateUserPassword(
     id: number,
     { password }: UpdateUserPasswordInput,
-  ): Promise<CoreOutput> {
+  ): Promise<User> {
     const user = await this.getUser(id);
-    const updatedUser = new User({ ...user, password });
-    await updatedUser.hashPassword();
-    await this.users.save(updatedUser);
-    return {
-      ok: true,
-    };
+    user.password = password;
+    await user.hashPassword();
+    return await this.users.save(user);
   }
 }

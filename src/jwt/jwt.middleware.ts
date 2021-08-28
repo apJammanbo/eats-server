@@ -11,7 +11,7 @@ export class JwtMiddleWare implements NestMiddleware {
   ) {}
   async use(req: Request, res: Response, next: NextFunction) {
     try {
-      if (req.headers.jwt) {
+      if (req.body.operationName !== 'IntrospectionQuery' && req.headers.jwt) {
         const decoded = this.jwtService.verify(req.headers.jwt as string);
         const id = decoded['id'];
         const user = await this.usersService.getUser(id);

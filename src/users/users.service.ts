@@ -6,16 +6,21 @@ import UserError, { USER_ERROR } from './processError';
 import { JwtService } from '../jwt/jwt.service';
 import {
   CreateUserInput,
-  LoginInput,
-  UpdateUserInput,
-  UpdateUserPasswordInput,
+  LoginArgs,
+  UpdateUserArgs,
+  UpdateUserPasswordArgs,
 } from './dtos/user.dto';
+import { Verification } from './entities/verification.entity';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(Verification)
+    private readonly verifications: Repository<Verification>,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   // Create User
@@ -26,20 +31,42 @@ export class UsersService {
     if (existUser) {
       throw new UserError(USER_ERROR.ALREADY_EXIST_EMAIL);
     }
-    return await this.users.save(this.users.create(createUserInput));
+
+    const user = await this.users.save(this.users.create(createUserInput));
+    const verification = await this.verifications.save(
+      this.verifications.create({
+        user,
+      }),
+    );
+    this.mailService.sendEmail({
+      from: `9oclock <apjammanbo@9oclock.com>`,
+      to: user.email,
+      template: 'confirm',
+      subject: `Hi ${user.name}`,
+      text: 'this is Text',
+      'v:username': `${user.name}`,
+      'v:code': `${verification.code}`,
+    });
+    return user;
   };
 
   // Login
-  async login({ email, password }: LoginInput): Promise<string> {
-    const user = await this.users.findOne({ email }, { select: ['password'] });
+  async login({ email, password }: LoginArgs): Promise<string> {
+    const user = await this.users.findOne(
+      { email },
+      { select: ['id', 'password'] },
+    );
     if (!user) {
       throw new UserError(USER_ERROR.USER_NOT_FOUND);
+    } else if (!user.verified) {
+      throw new UserError(USER_ERROR.NO_VERIFICATION_FOUND);
     } else {
       const isLogin = user.checkPassword(password);
       if (!isLogin) {
         throw new UserError(USER_ERROR.PASSWORD_NOT_CORRECT);
       }
-      return this.jwtService.sign({ id: user.id });
+      const token = this.jwtService.sign({ id: user.id });
+      return token;
     }
   }
 
@@ -53,12 +80,27 @@ export class UsersService {
   }
 
   // update user
-  async updateUser(
-    id: number,
-    updateUserInput: UpdateUserInput,
-  ): Promise<User> {
+  async updateUser(id: number, UpdateUserArgs: UpdateUserArgs): Promise<User> {
     const user = await this.getUser(id);
-    const updatedUser = new User({ ...user, ...updateUserInput });
+    const updatedUser = new User({ ...user, ...UpdateUserArgs });
+    if (UpdateUserArgs.email) {
+      UpdateUserArgs.verified = false;
+      const verification = await this.verifications.findOne({ user });
+      if (verification) {
+        await this.verifications.remove(verification);
+      }
+      await this.verifications.save(this.verifications.create({ user }));
+      this.mailService.sendEmail({
+        from: `9oclock <apjammanbo@9oclock.com>`,
+        to: user.email,
+        template: 'confirm',
+        subject: `Hi ${user.name}`,
+        text: 'this is Text',
+        'v:username': `${user.name}`,
+        'v:code': `${verification.code}`,
+      });
+      return user;
+    }
     await this.users.save(updatedUser);
     return await this.getUser(id);
   }
@@ -66,11 +108,26 @@ export class UsersService {
   // update password
   async updateUserPassword(
     id: number,
-    { password }: UpdateUserPasswordInput,
+    { password }: UpdateUserPasswordArgs,
   ): Promise<User> {
     const user = await this.getUser(id);
     user.password = password;
     await user.hashPassword();
     return await this.users.save(user);
+  }
+
+  // verifyEmail
+  async verifyEmail(code: string): Promise<boolean> {
+    const verification = await this.verifications.findOne(
+      { code },
+      { relations: ['user'] },
+    );
+    if (verification) {
+      verification.user.verified = true;
+      await this.users.save(verification.user);
+      await this.verifications.remove(verification);
+      return true;
+    }
+    return false;
   }
 }

@@ -13,6 +13,10 @@ const USER_ERROR = {
     code: 'PASSWORD_NOT_CORRECT',
     message: '비밀번호가 다릅니다.',
   },
+  NO_VERIFICATION_FOUND: {
+    code: 'NO_VERIFICATION_FOUND',
+    message: '이메일 인증내역이 없습니다.',
+  },
 };
 
 class UserError extends ApolloError {

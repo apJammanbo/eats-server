@@ -4,9 +4,9 @@ import { AuthGuard } from 'src/auth/auth.guard';
 import { AuthUser } from 'src/auth/authUser.decorator';
 import {
   CreateUserInput,
-  LoginInput,
-  UpdateUserInput,
-  UpdateUserPasswordInput,
+  LoginArgs,
+  UpdateUserArgs,
+  UpdateUserPasswordArgs,
 } from './dtos/user.dto';
 
 import { User } from './entities/user.entity';
@@ -17,13 +17,13 @@ export class UsersResolver {
   constructor(private readonly userService: UsersService) {}
 
   @Mutation(() => User)
-  async createUser(@Args() createUserInput: CreateUserInput): Promise<User> {
-    return await this.userService.createUser(createUserInput);
+  createUser(@Args() createUserInput: CreateUserInput): Promise<User> {
+    return this.userService.createUser(createUserInput);
   }
 
   @Query(() => String)
-  Login(@Args() loginInput: LoginInput): Promise<string> {
-    return this.userService.login(loginInput);
+  Login(@Args() loginArgs: LoginArgs): Promise<string> {
+    return this.userService.login(loginArgs);
   }
 
   @Query(() => User)
@@ -34,28 +34,30 @@ export class UsersResolver {
 
   @Query(() => User)
   @UseGuards(AuthGuard)
-  async user(@Args('id') id: number): Promise<User> {
-    return await this.userService.getUser(id);
+  user(@Args('id') id: number): Promise<User> {
+    return this.userService.getUser(id);
   }
 
   @Mutation(() => User)
   @UseGuards(AuthGuard)
-  async updateUser(
+  updateUser(
     @AuthUser() user: User,
-    @Args() updateUserInput: UpdateUserInput,
+    @Args() updateUserArgs: UpdateUserArgs,
   ): Promise<User> {
-    return await this.userService.updateUser(user.id, updateUserInput);
+    return this.userService.updateUser(user.id, updateUserArgs);
   }
 
   @Mutation(() => User)
   @UseGuards(AuthGuard)
-  async updateUserPassword(
+  updateUserPassword(
     @AuthUser() user: User,
-    @Args() updateUserPasswordInput: UpdateUserPasswordInput,
+    @Args() updateUserPasswordArgs: UpdateUserPasswordArgs,
   ): Promise<User> {
-    return await this.userService.updateUserPassword(
-      user.id,
-      updateUserPasswordInput,
-    );
+    return this.userService.updateUserPassword(user.id, updateUserPasswordArgs);
+  }
+
+  @Mutation(() => Boolean)
+  verifyEmail(@Args('code') code: string): Promise<boolean> {
+    return this.userService.verifyEmail(code);
   }
 }

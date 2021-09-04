@@ -30,14 +30,19 @@ export class User extends CoreEntity {
   @IsEmail()
   email: string;
 
+  @Column()
+  @Length(3, 40)
+  @Field(() => String)
+  name: string;
+
   @Column({ type: 'enum', enum: UserRole })
   @Field(() => UserRole)
   @IsEnum(UserRole)
   role: UserRole;
 
   @Column({ default: false })
-  @Field(() => Boolean)
-  verified: boolean;
+  @Field(() => Boolean, { nullable: true })
+  verified?: boolean;
 
   @BeforeInsert()
   async hashPassword() {

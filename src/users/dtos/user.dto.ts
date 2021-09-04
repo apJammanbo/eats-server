@@ -12,21 +12,24 @@ export class CreateUserInput extends OmitType(User, [
   'id',
   'createdAt',
   'updatedAt',
-]) {}
-
-@ArgsType()
-export class LoginInput extends PickType(User, ['email', 'password']) {
+]) {
   @Field(() => String)
   password: string;
 }
 
 @ArgsType()
-export class UpdateUserInput extends PartialType(
+export class LoginArgs extends PickType(User, ['email', 'password']) {
+  @Field(() => String)
+  password: string;
+}
+
+@ArgsType()
+export class UpdateUserArgs extends PartialType(
   PickType(User, ['email', 'role']),
 ) {}
 
 @ArgsType()
-export class UpdateUserPasswordInput extends PickType(User, ['password']) {
+export class UpdateUserPasswordArgs extends PickType(User, ['password']) {
   @Field()
   password: string;
 }
